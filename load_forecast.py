@@ -27,6 +27,20 @@ def load_profile_df(filename) -> pd.DataFrame:
     print(f)
     if f.endswith('.xls') or f.endswith('.xlsx'):
         df = pd.read_excel(f)
+        original_columns = list(df.columns)
+        df.drop("ADDTIME", axis=1, inplace=True)
+        print(original_columns)
+        #original_columns[0] = "Station"
+        original_columns = ["Load at 15 min {}".format(i) for i in range(1, len(original_columns[2:]))]
+        load_column_labels = original_columns
+        
+        original_columns.insert(0, "Station")
+        original_columns.insert(1, "Date")
+        df['Load Intervals'] = df[load_column_labels].shift(len(load_column_labels)-1, axis = "columns")
+        #df['Date'] = pd.to_datetime(df['Date'], format='%m/%d/%Y')
+        df.columns = original_columns
+        df.set_index('Load Intervals', inplace=True)
+        print(df.head())
     else:
         print('File type not supported. ', f)
         sys.exit()
@@ -34,43 +48,27 @@ def load_profile_df(filename) -> pd.DataFrame:
 
 directories = get_directories('Profiles')
 directories.sort()
-
-for d in directories:
-    print(d)
+my_load_profiles = load_profile_df(directories[0])
+#for d in directories:
+#    print(d)
     #print(load_profile_df(d).head())
 
 '''Plot/Evaluate Data'''
 def plot_load_data(df):
     """
     Plot the load data for each day over time.
+    Calculate the seasonal average and plot it
     """
-    
-    original_columns = list(df.columns)
-    df.drop("ADDTIME", axis=1, inplace=True)
-    print(original_columns)
-    #original_columns[0] = "Station"
-    original_columns = ["Load at 15 min {}".format(i) for i in range(1, len(original_columns[2:]))]
-    original_columns.insert(0, "Station")
-    original_columns.insert(1, "Date")
-    #df['Date'] = pd.to_datetime(df['Date'], format='%m/%d/%Y')
-    df.columns = original_columns
-    #df.set_index('Date', inplace=True)
-    #df.T
-    #date_column = df['Date']
-    
-    df.plot(
-        y = original_columns[2:],
+    pd.DataFrame(df.head()).plot(
+       # y = original_columns[2:],
         subplots = False
     )#columns = date_column)
     plt.title('Load Data')
     plt.xlabel('Time (15 min. Intervals)')
     plt.ylabel('Load (kWh)')
     plt.show()
+plot_load_data(my_load_profiles)
 
-    
-plot_load_data(load_profile_df(directories[0]))
-
-'''Prepare Data'''
 
 '''Preliminary Statistics'''
 def check_stationarity():
@@ -84,12 +82,16 @@ def moving_average(df, window):
     Calculates the moving average of a given dataframe.
     """
     return df.rolling(window=window).mean()
+print('MOVING AVERAGE')
+print(moving_average)
 
 def get_seasonal_avg(df, season):
     """
     Calculates the seasonal average of a given dataframe.
     """
     return df.groupby(df.index.month).mean()
+print("SEASONAL AVERAGE")
+print(get_seasonal_avg(my_load_profiles, 1))
 
 def plot_seasonal_avg(df, season):
     """
@@ -101,6 +103,8 @@ def plot_seasonal_avg(df, season):
     plt.xlabel('Month')
     plt.ylabel('Temperature (C)')
     plt.show()
+
+
 
 '''Model Building'''
 
