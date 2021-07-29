@@ -18,6 +18,7 @@ def get_directories(path) -> list:
     """
     return [d for d in os.listdir(path) if os.path.isdir(os.path.join(path, d))]
 
+
 def load_profile_df(filename) -> pd.DataFrame:
     """
     Converts xls and xlsx files to pandas dataframe.
@@ -28,23 +29,25 @@ def load_profile_df(filename) -> pd.DataFrame:
     if f.endswith('.xls') or f.endswith('.xlsx'):
         df = pd.read_excel(f)
         df.drop("ADDTIME", axis=1, inplace=True)
-        df.drop("PType_WZ", axis=1, inplace=True)
-        df.drop((df.columns)[-4:], axis=1, inplace=True)
+        df.rename(columns={"PType_WZ":"Station"}, inplace=True)
+        df.drop((df.columns)[-5:], axis=1, inplace=True)
         original_columns = list(df.columns)
         print(original_columns)
-        #original_columns[0] = "Station"
-        original_columns = ["Load at Interval {}".format(i) for i in range(1, len(original_columns))]
+        original_columns[0] = "Station"
+        original_columns = ["Load at Interval {}".format(i) for i in range(1, len(original_columns[:])-1)]
         interval_column_labels = original_columns
         
-        #original_columns.insert(0, "Station")
-        original_columns.insert(0, "Date")
+        original_columns.insert(0, "Station")
+        original_columns.insert(1, "Date")
         #df['Load Intervals'] = df[interval_column_labels].shift(len(interval_column_labels)-1, axis = "columns")
         #df['Date'] = pd.to_datetime(df['Date'], format='%m/%d/%Y')
+        print(original_columns)
         df.columns = original_columns
         print(df.columns)
         #df.groupby(df.index.day).mean()
-        #df.set_index('Load Intervals', inplace=True)
-        df.set_index(interval_column_labels, inplace=True)
+        #df.set_index('Date', inplace=True)
+        #df.set_index(interval_column_labels, inplace=True)
+        
         print(df.head())
     else:
         print('File type not supported. ', f)
@@ -65,16 +68,19 @@ def plot_load_data(df, label_columns):
     Add label_columns and reindex.
     Plot the load data"""
     #df.drop("Station", axis=1, inplace=True)
-    df.sort_values(by=['Date'], inplace=True)
+   # df.sort_values(by=['Date'], inplace=True)
     #df.reset_index(inplace=True, drop=True)
-    df.plot()
+    df.plot(y = label_columns)
     plt.title('Load Profile')
     plt.xlabel('Date')
     plt.ylabel('Load (MW)')
     plt.show()
 
-
-plot_load_data(my_load_profiles, interval_column_labels)
+print("MY LOAD DATAFRAME")
+"""Merge two columns within dataframe"""
+my_load_profiles= my_load_profiles.groupby(my_load_profiles["Station"])
+print(my_load_profiles.head())
+#plot_load_data(my_load_profiles, interval_column_labels)
 
 
 '''Preliminary Statistics'''
