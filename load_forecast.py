@@ -1,13 +1,14 @@
+import datetime
+import os
+import sys
+from dataclasses import dataclass
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import sys
-from dataclasses import dataclass
-import os
-import datetime
 import tensorflow as tf
-from tensorflow import keras
 import tensorflow_decision_forests as tfdf
+from tensorflow import keras
 
 cwd = os.getcwd()
 
@@ -17,6 +18,8 @@ def get_directories(path) -> list:
     Returns a list of directories in the given path.
     """
     return [d for d in os.listdir(path) if os.path.isdir(os.path.join(path, d))]
+directories = get_directories('Profiles')
+directories.sort()
 
 
 def load_profile_df(filename) -> pd.DataFrame:
@@ -27,7 +30,9 @@ def load_profile_df(filename) -> pd.DataFrame:
     f = cwd+'/Profiles/'+filename+'/'+os.listdir(cwd+'/Profiles/'+filename)[0]
     print(f)
     if f.endswith('.xls') or f.endswith('.xlsx'):
-        df = pd.read_excel(f)
+        df = pd.read_excel(f, sheet_name=None)
+        df = pd.concat(df)
+        print(df)
         df.drop("ADDTIME", axis=1, inplace=True)
         df.rename(columns={"PType_WZ":"Station"}, inplace=True)
         df.drop((df.columns)[-4:], axis=1, inplace=True)
@@ -47,31 +52,34 @@ def load_profile_df(filename) -> pd.DataFrame:
         #df.groupby(df.index.day).mean()
         #df.set_index('Date', inplace=True)
         #df.set_index(interval_column_labels, inplace=True)
-        
         print(df)
     else:
         print('File type not supported. ', f)
         sys.exit()
     return df, interval_column_labels
 
-directories = get_directories('Profiles')
-directories.sort()
-my_load_profiles, interval_column_labels = load_profile_df(directories[0])
 
-#for d in directories:
-#    print(d)
-    #print(load_profile_df(d).head())
+
+#my_load_profiles, interval_column_labels = load_profile_df(directories[0])
+def concat_all_excel_dfs(directories):
+    full_df = pd.DataFrame()
+    for d in directories:
+        df, _ = load_profile_df(d)
+        full_df = pd.concat([full_df, df])
+    return full_df
+my_load_profiles = concat_all_excel_dfs(directories)
 
 '''Plot/Evaluate Data'''
 def plot_load_data(df):
     """
     Plot the load data for each row in the dataframe."""
     df.drop(df.columns[:2], axis=1, inplace=True)
-    print(df.head())
-    fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
+    #print(df.head())
+    plt.figure(figsize=(15,5))
     plt.plot(df.iloc[1, :])
     plt.title("Loads across 24 hours")
-    plt.xlabel("Hour")
+    plt.xticks(np.arange(0, len(df.columns), 6), df.columns[::6], rotation=45)
+    plt.xlabel("Interval (15 min.)")
     plt.ylabel("Load (kWh)")
     plt.show()
     df.plot()
@@ -124,29 +132,19 @@ def plot_seasonal_avg(df, season):
 
 
 '''Model Building'''
-tf_dataset = tf.data.Dataset.from_tensor_slices((my_load_profiles.index.values, my_load_profiles.values))
-model = tfdf.keras.RandomForestModel()
-model.fit(tf_dataset)
-print(model.summary())
+
+@dataclass
+class BaseLineModel:
+    tf_dataset = tf.data.Dataset.from_tensor_slices((my_load_profiles.index.values, my_load_profiles.values))
+    tf_dataset_training = tf_dataset.shuffle(buffer_size=1000).batch(1).repeat(1)
+    tf_dataset_test = tf_dataset.shuffle(buffer_size=1000).batch(1).repeat(1)
+    model = tfdf.keras.RandomForestModel()
+    model.fit(tf_dataset_training)
+    model.predict(tf_dataset_test)
+    print(model.summary())
+
 
 
 @dataclass
-class Forecast_Model(training_data, validation_data):
-    """
-    Time-Series Forecast Model.
-    """
-    forecast_model: object
-    forecast_model_name: str
-    forecast_model_data: pd.DataFrame
-    forecast_model_data_columns: list
-
-    class baseline_model(Forecast_Model):
-        def __init__(self):
-            pass
-
-    def call(self, inputs):
-        if self.label_index is None:
-            return inputs
-        result = inputs[:, :, self.label_index]
-        return result[:, :, tf.newaxis]
-
+class Logistic_Regression:
+    """Build a logistic regression model for the"""
