@@ -98,8 +98,7 @@ def check_stationarity():
     """
     pass
 
-def moving_average_model(df, season):
-    """"""
+
 
 def moving_average(df, window):
     """
