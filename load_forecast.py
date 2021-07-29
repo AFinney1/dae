@@ -7,7 +7,7 @@ import os
 import datetime
 import tensorflow as tf
 from tensorflow import keras
-
+import tensorflow_decision_forests as tfdf
 
 cwd = os.getcwd()
 
@@ -30,7 +30,7 @@ def load_profile_df(filename) -> pd.DataFrame:
         df = pd.read_excel(f)
         df.drop("ADDTIME", axis=1, inplace=True)
         df.rename(columns={"PType_WZ":"Station"}, inplace=True)
-        df.drop((df.columns)[-5:], axis=1, inplace=True)
+        df.drop((df.columns)[-4:], axis=1, inplace=True)
         original_columns = list(df.columns)
         print(original_columns)
         original_columns[0] = "Station"
@@ -48,7 +48,7 @@ def load_profile_df(filename) -> pd.DataFrame:
         #df.set_index('Date', inplace=True)
         #df.set_index(interval_column_labels, inplace=True)
         
-        print(df.head())
+        print(df)
     else:
         print('File type not supported. ', f)
         sys.exit()
@@ -63,24 +63,28 @@ my_load_profiles, interval_column_labels = load_profile_df(directories[0])
     #print(load_profile_df(d).head())
 
 '''Plot/Evaluate Data'''
-def plot_load_data(df, label_columns):
-    """Sort the dataframe with respect to date.
-    Add label_columns and reindex.
-    Plot the load data"""
-    #df.drop("Station", axis=1, inplace=True)
-   # df.sort_values(by=['Date'], inplace=True)
-    #df.reset_index(inplace=True, drop=True)
-    df.plot(y = label_columns)
-    plt.title('Load Profile')
-    plt.xlabel('Date')
-    plt.ylabel('Load (MW)')
+def plot_load_data(df):
+    """
+    Plot the load data for each row in the dataframe."""
+    df.drop(df.columns[:2], axis=1, inplace=True)
+    print(df.head())
+    fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
+    plt.plot(df.iloc[1, :])
+    plt.title("Loads across 24 hours")
+    plt.xlabel("Hour")
+    plt.ylabel("Load (kWh)")
     plt.show()
+    df.plot()
+    
 
-print("MY LOAD DATAFRAME")
-"""Merge two columns within dataframe"""
-my_load_profiles= my_load_profiles.groupby(my_load_profiles["Station"])
+
+print("MY LOAD DATAFRAME: ")
 print(my_load_profiles.head())
-#plot_load_data(my_load_profiles, interval_column_labels)
+print(my_load_profiles.shape)
+print(my_load_profiles.columns)
+print(my_load_profiles.index)
+plot_load_data(my_load_profiles)
+
 
 
 '''Preliminary Statistics'''
@@ -120,9 +124,14 @@ def plot_seasonal_avg(df, season):
 
 
 '''Model Building'''
+tf_dataset = tf.data.Dataset.from_tensor_slices((my_load_profiles.index.values, my_load_profiles.values))
+model = tfdf.keras.RandomForestModel()
+model.fit(tf_dataset)
+print(model.summary())
+
 
 @dataclass
-class Forecast_Model:
+class Forecast_Model(training_data, validation_data):
     """
     Time-Series Forecast Model.
     """
@@ -132,7 +141,8 @@ class Forecast_Model:
     forecast_model_data_columns: list
 
     class baseline_model(Forecast_Model):
-        super()
+        def __init__(self):
+            pass
 
     def call(self, inputs):
         if self.label_index is None:
