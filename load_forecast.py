@@ -3,6 +3,8 @@ import os
 import sys
 from dataclasses import dataclass
 
+import sklearn
+from sklearn.model_selection import TimeSeriesSplit
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -131,8 +133,7 @@ def plot_seasonal_avg(df, season):
 
 
 """Dataset Partitioning"""
-#tf_dataset = tf.data.Dataset.from_tensor_slices((my_load_profiles.index.values, my_load_profiles.values))
-tf_dataset = tfdf.keras.pd_dataframe_to_tf_dataset(my_load_profiles, batch_size=1, shuffle=False)
+tf_dataset = tf.data.Dataset.from_tensor_slices((my_load_profiles.index.values, my_load_profiles.values))
 tf_dataset_training = tf_dataset.batch(1).repeat(1)
 tf_dataset_test = tf_dataset.batch(1).repeat(1)
 
@@ -157,4 +158,6 @@ print(nn.summary())
 
 
 
-"""Build a logistic regression model for the"""
+def mse_moving_average(df, true_df,):
+    """Given a moving average dataframe and the true value dataframe, calculate the mse between the moving average and the true values"""
+    return ((df - true_df)**2).mean()
