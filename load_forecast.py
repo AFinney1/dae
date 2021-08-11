@@ -3,6 +3,8 @@ import os
 import sys
 from dataclasses import dataclass
 
+import sklearn
+from sklearn.model_selection import TimeSeriesSplit
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -57,10 +59,6 @@ def load_profile_df(filename) -> pd.DataFrame:
         print('File type not supported. ', f)
         sys.exit()
     return df, interval_column_labels
-
-
-
-#my_load_profiles, interval_column_labels = load_profile_df(directories[0])
 def concat_all_excel_dfs(directories):
     full_df = pd.DataFrame()
     for d in directories:
@@ -68,6 +66,9 @@ def concat_all_excel_dfs(directories):
         full_df = pd.concat([full_df, df])
     return full_df
 my_load_profiles = concat_all_excel_dfs(directories)
+
+
+
 
 '''Plot/Evaluate Data'''
 def plot_load_data(df):
@@ -83,9 +84,6 @@ def plot_load_data(df):
     plt.ylabel("Load (kWh)")
     plt.show()
     df.plot()
-    
-
-
 print("MY LOAD DATAFRAME: ")
 print(my_load_profiles.head())
 print(my_load_profiles.shape)
@@ -101,6 +99,8 @@ def check_stationarity():
     Check for constant mean and variance, and covariance is independent of time.
     """
     pass
+
+
 
 def moving_average(df, window):
     """
@@ -131,20 +131,33 @@ def plot_seasonal_avg(df, season):
 
 
 
+
+"""Dataset Partitioning"""
+tf_dataset = tf.data.Dataset.from_tensor_slices((my_load_profiles.index.values, my_load_profiles.values))
+tf_dataset_training = tf_dataset.batch(1).repeat(1)
+tf_dataset_test = tf_dataset.batch(1).repeat(1)
+
+
 '''Model Building'''
+random_forest = tfdf.keras.RandomForestModel()
+random_forest.fit(tf_dataset_training)
+random_forest.predict(tf_dataset_test)
+print(random_forest.summary())
 
-@dataclass
-class BaseLineModel:
-    tf_dataset = tf.data.Dataset.from_tensor_slices((my_load_profiles.index.values, my_load_profiles.values))
-    tf_dataset_training = tf_dataset.shuffle(buffer_size=1000).batch(1).repeat(1)
-    tf_dataset_test = tf_dataset.shuffle(buffer_size=1000).batch(1).repeat(1)
-    model = tfdf.keras.RandomForestModel()
-    model.fit(tf_dataset_training)
-    model.predict(tf_dataset_test)
-    print(model.summary())
+nn = tf.keras.Sequential([
+    tf.keras.layers.Dense(96, input_shape=(96,), activation='relu'),
+    tf.keras.layers.Dropout(0.2),
+    tf.keras.layers.Dense(96, activation='relu'),
+    tf.keras.layers.Dropout(0.2),
+    tf.keras.layers.Dense(96, output_shape =(96), activation='relu'),
+])
+nn.compile(optimizer='adam', loss='mse')
+nn.fit(tf_dataset_training, epochs=10)
+nn.predict(tf_dataset_test)
+print(nn.summary())
 
 
 
-@dataclass
-class Logistic_Regression:
-    """Build a logistic regression model for the"""
+def mse_moving_average(df, true_df,):
+    """Given a moving average dataframe and the true value dataframe, calculate the mse between the moving average and the true values"""
+    return ((df - true_df)**2).mean()
